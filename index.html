@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Globe ADS-B — Live Aircraft Tracker</title>
+    <meta name="description" content="WebGPU-powered live aircraft tracking with 3D globe and 2D map modes" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <!-- WebGPU Canvas -->
+    <canvas id="gpu-canvas"></canvas>
+
+    <!-- HUD Overlay -->
+    <div id="hud"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+      <div class="loading-content">
+        <div class="loading-logo">GLOBE ADS-B</div>
+        <div class="loading-subtitle">WebGPU Aircraft Tracker</div>
+        <div class="loading-spinner"></div>
+        <div class="loading-status">Initializing WebGPU...</div>
+      </div>
+    </div>
+
+    <!-- Error Overlay -->
+    <div id="error-overlay" style="display:none">
+      <div class="error-message"></div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
