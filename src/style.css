@@ -1,3 +1,44 @@
+/* ─── Route Display ─────────────────────────────────────────────────────────── */
+.route-section {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.route-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.route-airport {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.route-iata {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.route-city {
+  font-size: 10px;
+  color: var(--text3);
+  text-align: center;
+}
+
+.route-arrow {
+  color: var(--text3);
+  font-size: 16px;
+  flex: 1;
+  text-align: center;
+}
+
 /* ─── Reset ─────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

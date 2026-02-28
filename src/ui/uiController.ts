@@ -1,6 +1,7 @@
 // UI Controller for the adsb.lol-style interface
 import type { Aircraft, AircraftFilter, AircraftCategory } from '../types/aircraft.ts';
 import { defaultFilter } from '../types/aircraft.ts';
+import { fetchRouteInfo, type RouteInfo } from '../data/routesetClient.ts';
 
 export interface UiState {
   aircraftCount: number;
@@ -119,51 +120,88 @@ export class UiController {
     const vsClass = ac.verticalRateFpm > 100 ? 'up' : ac.verticalRateFpm < -100 ? 'down' : '';
     const vsArrow = ac.verticalRateFpm > 100 ? '▲' : ac.verticalRateFpm < -100 ? '▼' : '→';
 
-    bodyEl.innerHTML = `
-      <div class="detail-grid">
-        <div class="detail-item">
-          <span class="detail-label">Altitude</span>
-          <span class="detail-value ${altColor}">${ac.altitudeFt.toLocaleString()} ft</span>
+    const renderBody = (route: RouteInfo | null): string => {
+      const routeHtml = route && route._airports.length >= 2
+        ? `
+          <div class="detail-item full route-section">
+            <span class="detail-label">Route</span>
+            <div class="route-display">
+              <div class="route-airport">
+                <span class="route-iata">${route._airports[0]?.iata ?? '?'}</span>
+                <span class="route-city">${route._airports[0]?.location ?? ''}</span>
+              </div>
+              <span class="route-arrow">→</span>
+              <div class="route-airport">
+                <span class="route-iata">${route._airports[1]?.iata ?? '?'}</span>
+                <span class="route-city">${route._airports[1]?.location ?? ''}</span>
+              </div>
+            </div>
+          </div>
+        `
+        : '';
+
+      return `
+        ${routeHtml}
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Altitude</span>
+            <span class="detail-value ${altColor}">${ac.altitudeFt.toLocaleString()} ft</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Speed</span>
+            <span class="detail-value">${ac.groundSpeedKts.toFixed(0)} kts</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Heading</span>
+            <span class="detail-value">${ac.trackDeg.toFixed(0)}°</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Vert. Rate</span>
+            <span class="detail-value ${vsClass}">${vsArrow} ${Math.abs(ac.verticalRateFpm).toFixed(0)} fpm</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Squawk</span>
+            <span class="detail-value">${ac.squawk}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Type</span>
+            <span class="detail-value">${ac.typeCode || '—'}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Reg.</span>
+            <span class="detail-value">${ac.registration || '—'}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Category</span>
+            <span class="detail-value">${ac.category}</span>
+          </div>
+          <div class="detail-item full">
+            <span class="detail-label">ICAO24</span>
+            <span class="detail-value">${ac.icao24.toUpperCase()}</span>
+          </div>
+          <div class="detail-item full">
+            <span class="detail-label">Position</span>
+            <span class="detail-value">${ac.lat.toFixed(4)}° ${ac.lat >= 0 ? 'N' : 'S'} / ${Math.abs(ac.lon).toFixed(4)}° ${ac.lon >= 0 ? 'E' : 'W'}</span>
+          </div>
         </div>
-        <div class="detail-item">
-          <span class="detail-label">Speed</span>
-          <span class="detail-value">${ac.groundSpeedKts.toFixed(0)} kts</span>
-        </div>
-        <div class="detail-item">
-          <span class="detail-label">Heading</span>
-          <span class="detail-value">${ac.trackDeg.toFixed(0)}°</span>
-        </div>
-        <div class="detail-item">
-          <span class="detail-label">Vert. Rate</span>
-          <span class="detail-value ${vsClass}">${vsArrow} ${Math.abs(ac.verticalRateFpm).toFixed(0)} fpm</span>
-        </div>
-        <div class="detail-item">
-          <span class="detail-label">Squawk</span>
-          <span class="detail-value">${ac.squawk}</span>
-        </div>
-        <div class="detail-item">
-          <span class="detail-label">Type</span>
-          <span class="detail-value">${ac.typeCode || '—'}</span>
-        </div>
-        <div class="detail-item">
-          <span class="detail-label">Reg.</span>
-          <span class="detail-value">${ac.registration || '—'}</span>
-        </div>
-        <div class="detail-item">
-          <span class="detail-label">Category</span>
-          <span class="detail-value">${ac.category}</span>
-        </div>
-        <div class="detail-item full">
-          <span class="detail-label">ICAO24</span>
-          <span class="detail-value">${ac.icao24.toUpperCase()}</span>
-        </div>
-        <div class="detail-item full">
-          <span class="detail-label">Position</span>
-          <span class="detail-value">${ac.lat.toFixed(4)}° ${ac.lat >= 0 ? 'N' : 'S'} / ${Math.abs(ac.lon).toFixed(4)}° ${ac.lon >= 0 ? 'E' : 'W'}</span>
-        </div>
-      </div>
-      ${ac.isOnGround ? '<div class="ground-badge">ON GROUND</div>' : ''}
-    `;
+        ${ac.isOnGround ? '<div class="ground-badge">ON GROUND</div>' : ''}
+      `;
+    };
+
+    // Show basic info immediately
+    bodyEl.innerHTML = renderBody(null);
+
+    // Fetch route info asynchronously
+    if (ac.callsign) {
+      fetchRouteInfo(ac.callsign, ac.lat, ac.lon).then((route) => {
+        // Only update if this aircraft is still selected
+        if (panel.style.display !== 'none' && callsignEl.textContent === (ac.callsign || ac.icao24.toUpperCase())) {
+          bodyEl.innerHTML = renderBody(route);
+        }
+      }).catch(() => {
+        // Route fetch failed, keep basic info
+      });
+    }
   }
 
   private updateAircraftList(aircraft: readonly Aircraft[], selectedIcao: string | null): void {
