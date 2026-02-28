@@ -170,12 +170,26 @@ export class MapApp {
       this.lastFpsTime = now;
     }
 
-    // Get nearby aircraft (sorted by distance to map center)
+    // Get nearby aircraft: first show those in viewport, then by distance
+    const bounds = this.createProjector().getBounds();
     const center = this.map.getCenter();
+    const centerLat = center.y as number;
+    const centerLon = center.x as number;
+
     const nearbyAircraft = [...this.filteredAircraft]
       .sort((a, b) => {
-        const da = Math.hypot(a.lat - center.y, a.lon - center.x);
-        const db = Math.hypot(b.lat - center.y, b.lon - center.x);
+        // Prioritize aircraft in viewport
+        const aInView = a.lon >= bounds.minLon && a.lon <= bounds.maxLon &&
+                        a.lat >= bounds.minLat && a.lat <= bounds.maxLat;
+        const bInView = b.lon >= bounds.minLon && b.lon <= bounds.maxLon &&
+                        b.lat >= bounds.minLat && b.lat <= bounds.maxLat;
+
+        if (aInView && !bInView) return -1;
+        if (!aInView && bInView) return 1;
+
+        // Then sort by distance to center
+        const da = Math.hypot(a.lat - centerLat, a.lon - centerLon);
+        const db = Math.hypot(b.lat - centerLat, b.lon - centerLon);
         return da - db;
       })
       .slice(0, 50);

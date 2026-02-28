@@ -69,6 +69,12 @@ export class AdsbClient {
 
   start(onUpdate: (aircraft: readonly Aircraft[]) => void): void {
     this.onUpdate = onUpdate;
+
+    // Immediately show simulation data while waiting for first API response
+    // This ensures the map is populated instantly
+    this.activateSimulation();
+
+    // Then try the real API
     void this.poll();
     this.pollTimer = setInterval(() => void this.poll(), POLL_INTERVAL_MS);
   }
