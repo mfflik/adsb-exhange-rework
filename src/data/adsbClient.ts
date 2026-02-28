@@ -2,10 +2,14 @@
 import type { Aircraft, AircraftCategory, AdsbApiResponse, AdsbApiAircraft } from '../types/aircraft.ts';
 
 // Use Vite proxy in dev (/api/adsb → https://api.adsb.lol)
-// In production, use a CORS proxy or direct URL if server supports it
+// In production, try direct URL first (may work if CORS is enabled),
+// then fall back to corsproxy.io
 const API_BASE = import.meta.env.DEV
   ? '/api/adsb/v2'
   : 'https://api.adsb.lol/v2';
+
+// CORS proxy fallback for production
+const CORS_PROXY = 'https://corsproxy.io/?url=';
 
 const POLL_INTERVAL_MS = 8000;
 
@@ -94,17 +98,37 @@ export class AdsbClient {
     return this.isSimulating ? this.simAircraft.length : this.aircraft.size;
   }
 
-  private async poll(): Promise<void> {
+  private async fetchAdsb(): Promise<AdsbApiResponse> {
+    const directUrl = `${API_BASE}/pia`;
+
+    // Try direct URL first
     try {
-      const response = await fetch(`${API_BASE}/pia`, {
+      const response = await fetch(directUrl, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (response.ok) {
+        return (await response.json()) as AdsbApiResponse;
+      }
+    } catch {
+      // Fall through to CORS proxy
+    }
+
+    // Try CORS proxy fallback (production only)
+    if (!import.meta.env.DEV) {
+      const proxyUrl = `${CORS_PROXY}${encodeURIComponent(directUrl)}`;
+      const response = await fetch(proxyUrl, {
         signal: AbortSignal.timeout(7000),
       });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return (await response.json()) as AdsbApiResponse;
+    }
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+    throw new Error('API unavailable');
+  }
 
-      const data = (await response.json()) as AdsbApiResponse;
+  private async poll(): Promise<void> {
+    try {
+      const data = await this.fetchAdsb();
       this.consecutiveFailures = 0;
 
       if (this.isSimulating) {
