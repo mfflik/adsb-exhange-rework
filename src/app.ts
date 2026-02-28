@@ -1,6 +1,7 @@
 import { initGpu, WebGPUNotSupportedError } from './gpu/device.ts';
 import { GlobeRenderer } from './renderers/globeRenderer.ts';
 import { AircraftRenderer } from './renderers/aircraftRenderer.ts';
+import { Airplane3DRenderer } from './renderers/airplane3dRenderer.ts';
 import { PickingRenderer } from './renderers/pickingRenderer.ts';
 import { Tile2DRenderer } from './renderers/tile2dRenderer.ts';
 import { CameraController } from './camera/cameraController.ts';
@@ -19,6 +20,7 @@ export class App {
   private ctx!: GpuContext;
   private globeRenderer!: GlobeRenderer;
   private aircraftRenderer!: AircraftRenderer;
+  private airplane3dRenderer!: Airplane3DRenderer;
   private pickingRenderer!: PickingRenderer;
   private tile2dRenderer!: Tile2DRenderer;
   private cameraController!: CameraController;
@@ -59,12 +61,14 @@ export class App {
     // Initialize renderers
     this.globeRenderer = new GlobeRenderer();
     this.aircraftRenderer = new AircraftRenderer();
+    this.airplane3dRenderer = new Airplane3DRenderer();
     this.pickingRenderer = new PickingRenderer();
     this.tile2dRenderer = new Tile2DRenderer();
 
     await Promise.all([
       this.globeRenderer.init(this.ctx),
       this.aircraftRenderer.init(this.ctx),
+      this.airplane3dRenderer.init(this.ctx),
       this.pickingRenderer.init(this.ctx),
       this.tile2dRenderer.init(this.ctx),
     ]);
@@ -260,7 +264,7 @@ export class App {
     const encoder = device.createCommandEncoder();
 
     if (camera.mode === '3d') {
-      // ── 3D MODE: WebGPU Globe + WebGPU Aircraft ──────────────────────────
+      // ── 3D MODE: WebGPU Globe + WebGPU 3D Airplane Objects ───────────────
       const cam3d = camera as Camera3D;
 
       // Update tile compositor for globe texture (low zoom)
@@ -269,12 +273,17 @@ export class App {
         this.globeRenderer.updateTexture(device, tileTexture);
       });
 
-      // Update aircraft instances (3D positions on sphere)
-      this.aircraftRenderer.updateAircraft(device, this.filteredAircraft, this.selectedIcao, '3d');
+      // Update 3D airplane instances
+      this.airplane3dRenderer.updateAircraft(
+        device,
+        this.filteredAircraft,
+        this.selectedIcao,
+        cam3d.distance
+      );
 
       // Update uniforms
       this.globeRenderer.updateUniforms(device, viewProjF32, cameraPosF32, params);
-      this.aircraftRenderer.updateUniforms(device, viewProjF32, cameraPosF32, params);
+      this.airplane3dRenderer.updateUniforms(device, viewProjF32, cameraPosF32, params);
 
       // Get depth texture
       const depthTexture = this.globeRenderer.ensureDepthTexture(device, w, h);
@@ -282,8 +291,8 @@ export class App {
 
       // Render globe
       this.globeRenderer.render(encoder, colorView, depthView);
-      // Render aircraft on top
-      this.aircraftRenderer.render(encoder, colorView, depthView, 'load');
+      // Render 3D airplane objects on top
+      this.airplane3dRenderer.render(encoder, colorView, depthView, 'load');
 
       device.queue.submit([encoder.finish()]);
 
@@ -409,6 +418,7 @@ export class App {
     this.adsbClient.stop();
     this.globeRenderer.destroy();
     this.aircraftRenderer.destroy();
+    this.airplane3dRenderer.destroy();
     this.pickingRenderer.destroy();
     this.tile2dRenderer.destroy();
     this.tileCompositor.destroy();
