@@ -4,6 +4,7 @@
 struct Uniforms {
   viewProj: mat4x4<f32>,
   cameraPos: vec4<f32>,
+  // x=time, y=selectedId, z=mode(0=3d,1=2d), w=aspect
   params: vec4<f32>,
 }
 
@@ -38,22 +39,34 @@ fn vs_pick(
   var out: VertexOutput;
   let inst = instances[instIdx];
   let worldPos = inst.posTrack.xyz;
+  let mode = uniforms.params.z;
+  let aspect = uniforms.params.w;
 
   let clipCenter = uniforms.viewProj * vec4<f32>(worldPos, 1.0);
 
-  if clipCenter.w <= 0.0 {
+  if mode < 0.5 && clipCenter.w <= 0.0 {
     out.clipPos = vec4<f32>(0.0, 0.0, -2.0, 1.0);
     out.instanceId = -1.0;
     return out;
   }
 
-  let pixelSize = 18.0; // slightly larger for easier picking
-  let ndcCenter = clipCenter.xy / clipCenter.w;
+  let pixelSize = 18.0;
   let quadVert = QUAD_VERTS[vertIdx];
-  let ndcOffset = quadVert * vec2<f32>(pixelSize / 800.0, pixelSize / 600.0);
-  let ndcPos = ndcCenter + ndcOffset;
 
-  out.clipPos = vec4<f32>(ndcPos * clipCenter.w, clipCenter.z, clipCenter.w);
+  if mode < 0.5 {
+    // 3D perspective
+    let ndcCenter = clipCenter.xy / clipCenter.w;
+    let ndcOffset = quadVert * vec2<f32>(pixelSize / 800.0, pixelSize / 600.0);
+    let ndcPos = ndcCenter + ndcOffset;
+    out.clipPos = vec4<f32>(ndcPos * clipCenter.w, clipCenter.z, clipCenter.w);
+  } else {
+    // 2D ortho
+    let ndcCenter = clipCenter.xy;
+    let ndcOffset = quadVert * vec2<f32>(pixelSize / 400.0, pixelSize / 400.0 * aspect);
+    let ndcPos = ndcCenter + ndcOffset;
+    out.clipPos = vec4<f32>(ndcPos, 0.0, 1.0);
+  }
+
   out.instanceId = inst.flags.y;
   return out;
 }

@@ -1,10 +1,10 @@
 // Aircraft instanced billboard shader
-// Each instance: vec3 position, float trackRad, vec3 color, float categoryId, float selected, float instanceId, pad, pad
+// Supports both 3D (sphere) and 2D (Mercator ortho) modes
 
 struct Uniforms {
   viewProj: mat4x4<f32>,
   cameraPos: vec4<f32>,
-  // x=time, y=selectedId, z=mode(0=3d,1=2d), w=screenHeight
+  // x=time, y=selectedId, z=mode(0=3d,1=2d), w=aspect(w/h)
   params: vec4<f32>,
 }
 
@@ -49,29 +49,47 @@ fn vs_main(
   let inst = instances[instIdx];
   let worldPos = inst.posTrack.xyz;
   let trackRad = inst.posTrack.w;
+  let mode = uniforms.params.z; // 0=3d, 1=2d
+  let aspect = uniforms.params.w;
 
   // Project center to clip space
   let clipCenter = uniforms.viewProj * vec4<f32>(worldPos, 1.0);
 
-  // Cull if behind camera
-  if clipCenter.w <= 0.0 {
+  // Cull if behind camera (3D only)
+  if mode < 0.5 && clipCenter.w <= 0.0 {
     out.clipPos = vec4<f32>(0.0, 0.0, -2.0, 1.0);
     return out;
   }
 
-  // Billboard size in pixels (constant screen size)
-  let pixelSize = 14.0;
-  let ndcCenter = clipCenter.xy / clipCenter.w;
-
-  // Aspect ratio correction
-  let aspect = uniforms.params.w; // screenWidth/screenHeight stored in params.w
   let quadVert = QUAD_VERTS[vertIdx];
 
-  // Apply pixel offset in NDC space
-  let ndcOffset = quadVert * vec2<f32>(pixelSize / 800.0, pixelSize / 600.0);
-  let ndcPos = ndcCenter + ndcOffset;
+  // Constant screen-space billboard size
+  // In 3D: offset in NDC space after perspective divide
+  // In 2D: offset in NDC space (ortho projection)
+  let pixelSize = 14.0;
 
-  out.clipPos = vec4<f32>(ndcPos * clipCenter.w, clipCenter.z, clipCenter.w);
+  var ndcCenter: vec2<f32>;
+  var ndcOffset: vec2<f32>;
+
+  if mode < 0.5 {
+    // 3D perspective mode
+    ndcCenter = clipCenter.xy / clipCenter.w;
+    // Scale offset by viewport (800x600 reference)
+    ndcOffset = quadVert * vec2<f32>(pixelSize / 800.0, pixelSize / 600.0);
+    let ndcPos = ndcCenter + ndcOffset;
+    out.clipPos = vec4<f32>(ndcPos * clipCenter.w, clipCenter.z, clipCenter.w);
+  } else {
+    // 2D ortho mode - clipCenter.w should be 1.0
+    ndcCenter = clipCenter.xy;
+    // In ortho, NDC units correspond to world units
+    // We need to scale pixel size to NDC units
+    // NDC range is [-1,1] = 2 units, canvas is ~800px wide
+    // So 1 NDC unit = 400px, pixelSize NDC = pixelSize/400
+    ndcOffset = quadVert * vec2<f32>(pixelSize / 400.0, pixelSize / 400.0 * aspect);
+    let ndcPos = ndcCenter + ndcOffset;
+    out.clipPos = vec4<f32>(ndcPos, 0.0, 1.0);
+  }
+
   out.uv = quadVert * 0.5 + 0.5;
   out.color = inst.colorCat.rgb;
   out.categoryId = inst.colorCat.w;
@@ -120,16 +138,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
   // 0=friend (rounded rect), 1=hostile (diamond), 2=neutral (square),
   // 3=unknown (circle), 4=civilian (circle)
   if catId == 0 {
-    // Friend: rounded rect with heading indicator
     dist = sdRoundedBox(p, vec2<f32>(0.55, 0.45), 0.2);
   } else if catId == 1 {
-    // Hostile: diamond
     dist = sdDiamond(p, 0.7);
   } else if catId == 2 {
-    // Neutral: square
     dist = sdBox(p, vec2<f32>(0.55, 0.55));
   } else {
-    // Unknown/Civilian: circle
     dist = sdCircle(p, 0.6);
   }
 

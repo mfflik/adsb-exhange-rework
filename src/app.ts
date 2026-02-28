@@ -1,30 +1,32 @@
 import { initGpu, WebGPUNotSupportedError } from './gpu/device.ts';
 import { GlobeRenderer } from './renderers/globeRenderer.ts';
-import { FlatMapRenderer } from './renderers/flatMapRenderer.ts';
 import { AircraftRenderer } from './renderers/aircraftRenderer.ts';
 import { PickingRenderer } from './renderers/pickingRenderer.ts';
+import { Tile2DRenderer } from './renderers/tile2dRenderer.ts';
 import { CameraController } from './camera/cameraController.ts';
 import { AdsbClient } from './data/adsbClient.ts';
 import { TileCache } from './tiles/tileCache.ts';
 import { TileCompositor } from './tiles/tileCompositor.ts';
 import { HudUI } from './ui/hud.ts';
+import { LabelOverlay } from './ui/labelOverlay.ts';
 import type { GpuContext } from './types/gpu.ts';
 import type { Aircraft, AircraftFilter } from './types/aircraft.ts';
 import { defaultFilter } from './types/aircraft.ts';
-import type { Camera2D } from './types/camera.ts';
+import type { Camera2D, Camera3D } from './types/camera.ts';
 import { defaultCamera3D, defaultCamera2D } from './types/camera.ts';
 
 export class App {
   private ctx!: GpuContext;
   private globeRenderer!: GlobeRenderer;
-  private flatMapRenderer!: FlatMapRenderer;
   private aircraftRenderer!: AircraftRenderer;
   private pickingRenderer!: PickingRenderer;
+  private tile2dRenderer!: Tile2DRenderer;
   private cameraController!: CameraController;
   private adsbClient!: AdsbClient;
   private tileCache!: TileCache;
   private tileCompositor!: TileCompositor;
   private hud!: HudUI;
+  private labelOverlay!: LabelOverlay;
 
   private allAircraft: readonly Aircraft[] = [];
   private filteredAircraft: readonly Aircraft[] = [];
@@ -56,15 +58,15 @@ export class App {
 
     // Initialize renderers
     this.globeRenderer = new GlobeRenderer();
-    this.flatMapRenderer = new FlatMapRenderer();
     this.aircraftRenderer = new AircraftRenderer();
     this.pickingRenderer = new PickingRenderer();
+    this.tile2dRenderer = new Tile2DRenderer();
 
     await Promise.all([
       this.globeRenderer.init(this.ctx),
-      this.flatMapRenderer.init(this.ctx),
       this.aircraftRenderer.init(this.ctx),
       this.pickingRenderer.init(this.ctx),
+      this.tile2dRenderer.init(this.ctx),
     ]);
 
     // Initialize camera
@@ -73,6 +75,10 @@ export class App {
     // Initialize tile system
     this.tileCache = new TileCache();
     this.tileCompositor = new TileCompositor(this.tileCache);
+
+    // Initialize label overlay (Canvas 2D on top of WebGPU canvas)
+    this.labelOverlay = new LabelOverlay();
+    this.labelOverlay.mount(document.body);
 
     // Initialize HUD
     this.hud = new HudUI(hudContainer, this.filter);
@@ -118,6 +124,7 @@ export class App {
 
     this.cameraController.resize(w, h);
     this.pickingRenderer.resize(this.ctx.device, w, h);
+    this.labelOverlay.resize(w, h);
   }
 
   private toggleViewMode(): void {
@@ -141,7 +148,6 @@ export class App {
   }
 
   private setupEvents(canvas: HTMLCanvasElement): void {
-    // Mouse events
     canvas.addEventListener('mousedown', (e) => {
       this.cameraController.onMouseDown(e.clientX, e.clientY);
     });
@@ -210,7 +216,6 @@ export class App {
       this.lastTouchDist = 0;
     });
 
-    // Keyboard
     window.addEventListener('keydown', (e) => {
       if (e.key === 'r' || e.key === 'R') {
         this.cameraController.resetCamera();
@@ -222,7 +227,7 @@ export class App {
     });
   }
 
-  private async renderLoop(): Promise<void> {
+  private renderLoop(): void {
     const jsStart = performance.now();
 
     const { device, context, canvas } = this.ctx;
@@ -230,7 +235,7 @@ export class App {
     const h = canvas.height;
 
     if (w === 0 || h === 0) {
-      this.animFrameId = requestAnimationFrame(() => void this.renderLoop());
+      this.animFrameId = requestAnimationFrame(() => this.renderLoop());
       return;
     }
 
@@ -238,50 +243,100 @@ export class App {
     const camera = this.cameraController.getCamera();
     const { viewProj, cameraPos } = this.cameraController.computeMatrices();
 
-    // Update tile compositor for globe texture
-    const tileZoom = camera.mode === '2d'
-      ? (camera as Camera2D).zoom
-      : Math.max(1, Math.min(5, 8 - Math.log2(1)));
+    const viewProjF32 = new Float32Array(viewProj);
+    const cameraPosF32 = new Float32Array([cameraPos[0], cameraPos[1], cameraPos[2], 1.0]);
 
-    const centerLon = camera.mode === '2d' ? (camera as Camera2D).centerLon : 0;
-    const centerLat = camera.mode === '2d' ? (camera as Camera2D).centerLat : 20;
-
-    const tileTexture = await this.tileCompositor.update(device, centerLon, centerLat, tileZoom);
-
-    // Update globe/map texture
-    if (camera.mode === '3d') {
-      this.globeRenderer.updateTexture(device, tileTexture);
-    } else {
-      this.flatMapRenderer.updateTexture(device, tileTexture);
-    }
-
-    // Build uniform data
     const params = new Float32Array([
       time,
       this.selectedIcao ? 1.0 : 0.0,
       camera.mode === '3d' ? 0.0 : 1.0,
-      w / h, // aspect ratio
+      w / h,
     ]);
 
-    const viewProjF32 = new Float32Array(viewProj);
-    const cameraPosF32 = new Float32Array([cameraPos[0], cameraPos[1], cameraPos[2], 1.0]);
+    // Get color texture
+    const colorTexture = context.getCurrentTexture();
+    const colorView = colorTexture.createView();
 
-    // Update aircraft instances
-    this.aircraftRenderer.updateAircraft(
-      device,
-      this.filteredAircraft,
-      this.selectedIcao,
-      camera.mode
-    );
+    const encoder = device.createCommandEncoder();
 
-    // Update uniforms
-    this.globeRenderer.updateUniforms(device, viewProjF32, cameraPosF32, params);
-    this.flatMapRenderer.updateUniforms(
-      device, viewProjF32, cameraPosF32, params,
-      new Float32Array([centerLon, centerLat, tileZoom, 0])
-    );
-    this.aircraftRenderer.updateUniforms(device, viewProjF32, cameraPosF32, params);
-    this.pickingRenderer.updateUniforms(device, viewProjF32, cameraPosF32, params);
+    if (camera.mode === '3d') {
+      // ── 3D MODE: WebGPU Globe + WebGPU Aircraft ──────────────────────────
+      const cam3d = camera as Camera3D;
+
+      // Update tile compositor for globe texture (low zoom)
+      const tileZoom = Math.max(1, Math.min(4, 6 - Math.log2(cam3d.distance)));
+      void this.tileCompositor.update(device, 0, 20, tileZoom).then((tileTexture) => {
+        this.globeRenderer.updateTexture(device, tileTexture);
+      });
+
+      // Update aircraft instances (3D positions on sphere)
+      this.aircraftRenderer.updateAircraft(device, this.filteredAircraft, this.selectedIcao, '3d');
+
+      // Update uniforms
+      this.globeRenderer.updateUniforms(device, viewProjF32, cameraPosF32, params);
+      this.aircraftRenderer.updateUniforms(device, viewProjF32, cameraPosF32, params);
+
+      // Get depth texture
+      const depthTexture = this.globeRenderer.ensureDepthTexture(device, w, h);
+      const depthView = depthTexture.createView();
+
+      // Render globe
+      this.globeRenderer.render(encoder, colorView, depthView);
+      // Render aircraft on top
+      this.aircraftRenderer.render(encoder, colorView, depthView, 'load');
+
+      device.queue.submit([encoder.finish()]);
+
+      // Canvas 2D label overlay for 3D mode
+      this.labelOverlay.render(
+        this.filteredAircraft,
+        viewProj,
+        w, h,
+        this.selectedIcao,
+        '3d',
+        cam3d.fovDeg,
+        0, 0
+      );
+
+    } else {
+      // ── 2D MODE: WebGPU OSM Tiles + WebGPU Aircraft ──────────────────────
+      const cam2d = camera as Camera2D;
+      const { centerLon, centerLat, zoom } = cam2d;
+
+      // Update tile atlas
+      void this.tileCompositor.update(device, centerLon, centerLat, zoom).then((tileTexture) => {
+        this.tile2dRenderer.updateAtlasTexture(device, tileTexture);
+      });
+
+      // Update tile instances
+      this.tile2dRenderer.updateTiles(device, centerLon, centerLat, zoom, w, h);
+
+      // Update aircraft instances (2D Mercator positions)
+      this.aircraftRenderer.updateAircraft(device, this.filteredAircraft, this.selectedIcao, '2d');
+      this.aircraftRenderer.updateUniforms(device, viewProjF32, cameraPosF32, params);
+
+      // Get depth texture for aircraft
+      const depthTexture = this.globeRenderer.ensureDepthTexture(device, w, h);
+      const depthView = depthTexture.createView();
+
+      // Render OSM tiles
+      this.tile2dRenderer.render(encoder, colorView);
+      // Render aircraft on top
+      this.aircraftRenderer.render(encoder, colorView, depthView, 'load');
+
+      device.queue.submit([encoder.finish()]);
+
+      // Canvas 2D label overlay for 2D mode
+      this.labelOverlay.render(
+        this.filteredAircraft,
+        viewProj,
+        w, h,
+        this.selectedIcao,
+        '2d',
+        zoom,
+        centerLon, centerLat
+      );
+    }
 
     // Handle pending pick
     if (this.hasPendingPick && !this.isPicking) {
@@ -290,8 +345,10 @@ export class App {
       const px = this.pendingPickX;
       const py = this.pendingPickY;
 
-      // Update picking bind group with current instance buffer
-      const instanceBuffer = (this.aircraftRenderer as unknown as { instanceBuffer: GPUBuffer | null }).instanceBuffer;
+      this.pickingRenderer.updateUniforms(device, viewProjF32, cameraPosF32, params);
+
+      // Access instance buffer via public method
+      const instanceBuffer = this.aircraftRenderer.getInstanceBuffer();
       if (instanceBuffer) {
         this.pickingRenderer.updateBindGroup(device, instanceBuffer);
       }
@@ -314,28 +371,6 @@ export class App {
         this.isPicking = false;
       });
     }
-
-    // Get depth texture
-    const depthTexture = this.globeRenderer.ensureDepthTexture(device, w, h);
-    const depthView = depthTexture.createView();
-
-    // Get color texture
-    const colorTexture = context.getCurrentTexture();
-    const colorView = colorTexture.createView();
-
-    // Render
-    const encoder = device.createCommandEncoder();
-
-    if (camera.mode === '3d') {
-      this.globeRenderer.render(encoder, colorView, depthView);
-      this.aircraftRenderer.render(encoder, colorView, depthView, 'load');
-    } else {
-      this.flatMapRenderer.render(encoder, colorView);
-      // For 2D, we need a depth texture too
-      this.aircraftRenderer.render(encoder, colorView, depthView, 'load');
-    }
-
-    device.queue.submit([encoder.finish()]);
 
     // FPS tracking
     this.frameCount++;
@@ -366,16 +401,17 @@ export class App {
       filter: this.filter,
     });
 
-    this.animFrameId = requestAnimationFrame(() => void this.renderLoop());
+    this.animFrameId = requestAnimationFrame(() => this.renderLoop());
   }
 
   destroy(): void {
     cancelAnimationFrame(this.animFrameId);
     this.adsbClient.stop();
     this.globeRenderer.destroy();
-    this.flatMapRenderer.destroy();
     this.aircraftRenderer.destroy();
     this.pickingRenderer.destroy();
+    this.tile2dRenderer.destroy();
     this.tileCompositor.destroy();
+    this.labelOverlay.destroy();
   }
 }

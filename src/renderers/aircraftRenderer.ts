@@ -1,7 +1,7 @@
 import type { GpuContext } from '../types/gpu.ts';
 import type { Aircraft, AircraftCategory } from '../types/aircraft.ts';
 import { AIRCRAFT_INSTANCE_FLOATS, AIRCRAFT_INSTANCE_BYTES } from '../types/aircraft.ts';
-import { latLonToXYZ, DEG2RAD, mercatorUV } from '../utils/math.ts';
+import { latLonToXYZ, DEG2RAD } from '../utils/math.ts';
 import { createUniformBuffer } from '../gpu/device.ts';
 import aircraftWgsl from '../shaders/aircraft.wgsl?raw';
 
@@ -135,10 +135,10 @@ export class AircraftRenderer {
         this.instanceData[base + 1] = pos[1] * r;
         this.instanceData[base + 2] = pos[2] * r;
       } else {
-        // 2D: Mercator position
-        const [u, v] = mercatorUV(ac.lat, ac.lon);
-        this.instanceData[base + 0] = (u * 2 - 1) * 180; // lon
-        this.instanceData[base + 1] = (1 - v * 2) * 90;  // lat approx
+        // 2D: use actual lon/lat - the aircraft shader will use the viewProj
+        // which is an ortho matrix mapping lon/lat to NDC
+        this.instanceData[base + 0] = ac.lon;
+        this.instanceData[base + 1] = ac.lat;
         this.instanceData[base + 2] = 0.5;
       }
 
@@ -210,6 +210,10 @@ export class AircraftRenderer {
 
   getInstanceCount(): number {
     return this.instanceCount;
+  }
+
+  getInstanceBuffer(): GPUBuffer | null {
+    return this.instanceBuffer;
   }
 
   destroy(): void {
