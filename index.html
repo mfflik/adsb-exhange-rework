@@ -2,33 +2,119 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Globe ADS-B — Live Aircraft Tracker</title>
-    <meta name="description" content="WebGPU-powered live aircraft tracking with 3D globe and 2D map modes" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>ADS-B Live — Aircraft Tracker</title>
+    <meta name="description" content="Live aircraft tracking powered by WebGPU and MapTalks" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <!-- WebGPU Canvas -->
+    <!-- MapTalks map container -->
+    <div id="map"></div>
+
+    <!-- WebGPU aircraft overlay canvas -->
     <canvas id="gpu-canvas"></canvas>
 
-    <!-- HUD Overlay -->
-    <div id="hud"></div>
+    <!-- UI Overlay -->
+    <div id="ui-overlay">
+      <!-- Top bar -->
+      <div id="topbar">
+        <div class="topbar-logo">
+          <span class="logo-icon">✈</span>
+          <span class="logo-text">ADS-B Live</span>
+        </div>
+        <div class="topbar-stats">
+          <div class="stat-chip" id="stat-aircraft">
+            <span class="stat-num" id="stat-count">0</span>
+            <span class="stat-lbl">aircraft</span>
+          </div>
+          <div class="stat-chip" id="stat-fps-chip">
+            <span class="stat-num" id="stat-fps">0</span>
+            <span class="stat-lbl">fps</span>
+          </div>
+          <div class="sim-badge" id="sim-badge" style="display:none">SIM</div>
+        </div>
+        <div class="topbar-controls">
+          <button class="ctrl-btn" id="btn-filter" title="Filters">⚙</button>
+          <button class="ctrl-btn" id="btn-reset" title="Reset view">⌂</button>
+        </div>
+      </div>
 
-    <!-- Loading Overlay -->
-    <div id="loading-overlay">
-      <div class="loading-content">
-        <div class="loading-logo">GLOBE ADS-B</div>
-        <div class="loading-subtitle">WebGPU Aircraft Tracker</div>
-        <div class="loading-spinner"></div>
-        <div class="loading-status">Initializing WebGPU...</div>
+      <!-- Filter panel -->
+      <div id="filter-panel" class="panel" style="display:none">
+        <div class="panel-header">
+          <span>Filters</span>
+          <button class="close-btn" id="filter-close">✕</button>
+        </div>
+        <div class="panel-body">
+          <div class="filter-group">
+            <label>Altitude (ft)</label>
+            <div class="range-row">
+              <input type="number" id="alt-min" value="-1000" min="-1000" max="60000" step="1000" />
+              <span>–</span>
+              <input type="number" id="alt-max" value="60000" min="0" max="60000" step="1000" />
+            </div>
+          </div>
+          <div class="filter-group">
+            <label>Categories</label>
+            <div class="cat-grid">
+              <label class="cat-item"><input type="checkbox" class="cat-cb" data-cat="civilian" checked /><span class="cat-dot" style="background:#ff44ff"></span>Civilian</label>
+              <label class="cat-item"><input type="checkbox" class="cat-cb" data-cat="friend" checked /><span class="cat-dot" style="background:#00e5ff"></span>Friend</label>
+              <label class="cat-item"><input type="checkbox" class="cat-cb" data-cat="neutral" checked /><span class="cat-dot" style="background:#33ff44"></span>Neutral</label>
+              <label class="cat-item"><input type="checkbox" class="cat-cb" data-cat="unknown" checked /><span class="cat-dot" style="background:#ffee11"></span>Unknown</label>
+              <label class="cat-item"><input type="checkbox" class="cat-cb" data-cat="hostile" checked /><span class="cat-dot" style="background:#ff3333"></span>Hostile</label>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label>Search callsign</label>
+            <input type="text" id="callsign-search" placeholder="e.g. UAL123" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Aircraft detail panel -->
+      <div id="detail-panel" class="panel" style="display:none">
+        <div class="panel-header">
+          <div class="detail-callsign" id="detail-callsign">—</div>
+          <button class="close-btn" id="detail-close">✕</button>
+        </div>
+        <div class="panel-body" id="detail-body"></div>
+      </div>
+
+      <!-- Aircraft list sidebar -->
+      <div id="aircraft-list">
+        <div class="list-header">
+          <span>Nearby Aircraft</span>
+          <span class="list-count" id="list-count">0</span>
+        </div>
+        <div class="list-body" id="list-body"></div>
+      </div>
+
+      <!-- Attribution -->
+      <div id="attribution">
+        © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a>
+        · Data: <a href="https://adsb.lol" target="_blank">adsb.lol</a>
       </div>
     </div>
 
-    <!-- Error Overlay -->
+    <!-- Loading overlay -->
+    <div id="loading">
+      <div class="loading-inner">
+        <div class="loading-icon">✈</div>
+        <div class="loading-title">ADS-B Live</div>
+        <div class="loading-spinner"></div>
+        <div class="loading-msg" id="loading-msg">Initializing...</div>
+      </div>
+    </div>
+
+    <!-- Error overlay -->
     <div id="error-overlay" style="display:none">
-      <div class="error-message"></div>
+      <div class="error-box">
+        <div class="error-icon">⚠</div>
+        <div class="error-title">WebGPU Required</div>
+        <div class="error-msg" id="error-msg"></div>
+      </div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

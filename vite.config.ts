@@ -19,5 +19,13 @@ export default defineConfig({
   build: {
     target: 'esnext',
     minify: 'esbuild',
+    chunkSizeWarningLimit: 700,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          maptalks: ['maptalks'],
+        },
+      },
+    },
   },
 });

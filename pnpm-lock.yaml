@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      maptalks:
+        specifier: ^1.12.1
+        version: 1.12.1
     devDependencies:
       '@webgpu/types':
         specifier: ^0.1.69
@@ -176,6 +180,12 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@maptalks/feature-filter@1.3.0':
+    resolution: {integrity: sha512-O6GcFzPuCbz6bO4TNBnmP8VunS0GexTzZ4m36A4HbYQICY1cplpFgntX2fyB/TY3cZrFRGoeMePBeMZFMOOhcQ==}
+
+  '@maptalks/function-type@1.4.1':
+    resolution: {integrity: sha512-Z78FdI8mZ4vdcBqxlMDV6HP6WE/njZ9PhlM5JwbURxW1DnQK7R1GP+fubkGJPP6hVSv0Y52/dK8cZE/HuXVZ3A==}
+
   '@rollup/rollup-android-arm-eabi@4.59.0':
     resolution: {integrity: sha512-upnNBkA6ZH2VKGcBj9Fyl9IGNPULcjXRlg0LLeaioQWueH30p6IXtJEbKAgvyv+mJaMxSm1l6xwDXYjpEMiLMg==}
     cpu: [arm]
@@ -320,6 +330,12 @@ packages:
   '@webgpu/types@0.1.69':
     resolution: {integrity: sha512-RPmm6kgRbI8e98zSD3RVACvnuktIja5+yLgDAkTmxLr90BEwdTXRQWNLF3ETTTyH/8mKhznZuN5AveXYFEsMGQ==}
 
+  colorin@0.5.0:
+    resolution: {integrity: sha512-gN6fIMCehYUonAhbmm5+ZHeFunG75u77hI2tRlVndNthO6v0wZMV2G2FwYSi8Ws4b4lpFJK1ql2a/MlW9z/Vhg==}
+
+  colorin@0.6.0:
+    resolution: {integrity: sha512-huI54MwKNMP6eypurqzxGf7rvTA3pNWdXZopQbN7v3TDxXYWyyGQ3CtQndNZ2Z0Gy6HDWqA7sRYxbjRDO2FZMA==}
+
   esbuild@0.27.3:
     resolution: {integrity: sha512-8VwMnyGCONIs6cWue2IdpHxHnAjzxnw2Zr7MkVxB2vjmQ2ivqGFb4LEG3SMnv0Gb2F/G/2yA8zUaiL1gywDCCg==}
     engines: {node: '>=18'}
@@ -334,10 +350,19 @@ packages:
       picomatch:
         optional: true
 
+  frustum-intersects@0.1.0:
+    resolution: {integrity: sha512-W0S6dmX5LJLtamimyuKhvbkpDTm5eVfMgk4X9yXNyWQ1zZ/cMm0PZoeX9Pm0tL302l+erQVrdfRGhV3ILfeTeQ==}
+
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
+
+  lineclip@1.1.5:
+    resolution: {integrity: sha512-KlA/wRSjpKl7tS9iRUdlG72oQ7qZ1IlVbVgHwoO10TBR/4gQ86uhKow6nlzMAJJhjCWKto8OeoAzzIzKSmN25A==}
+
+  maptalks@1.12.1:
+    resolution: {integrity: sha512-Vvr6Ikp3GRtPToUhPD0FzyA+tLLp8dsakJdNvp6N6ScPnQw9gfS+bpZP7Apc0kEjGBK55mHzJmuyNaQxYuhLlw==}
 
   nanoid@3.3.11:
     resolution: {integrity: sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==}
@@ -355,10 +380,19 @@ packages:
     resolution: {integrity: sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg==}
     engines: {node: ^10 || ^12 || >=14}
 
+  quickselect@1.1.1:
+    resolution: {integrity: sha512-qN0Gqdw4c4KGPsBOQafj6yj/PA6c/L63f6CaZ/DCF/xF4Esu3jVmKLUDYxghFx8Kb/O7y9tI7x2RjTSXwdK1iQ==}
+
+  rbush@2.0.2:
+    resolution: {integrity: sha512-XBOuALcTm+O/H8G90b6pzu6nX6v2zCKiFG4BJho8a+bY6AER6t8uQUZdi5bomQc0AprCWhEGa7ncAbbRap0bRA==}
+
   rollup@4.59.0:
     resolution: {integrity: sha512-2oMpl67a3zCH9H79LeMcbDhXW/UmWG/y2zuqnF2jQq5uq9TbM9TVyXvA4+t+ne2IIkBdrLpAaRQAvo7YI/Yyeg==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
+
+  simplify-js@1.2.4:
+    resolution: {integrity: sha512-vITfSlwt7h/oyrU42R83mtzFpwYk3+mkH9bOHqq/Qw6n8rtR7aE3NZQ5fbcyCUVVmuMJR6ynsAhOfK2qoah8Jg==}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -493,6 +527,12 @@ snapshots:
   '@esbuild/win32-x64@0.27.3':
     optional: true
 
+  '@maptalks/feature-filter@1.3.0': {}
+
+  '@maptalks/function-type@1.4.1':
+    dependencies:
+      colorin: 0.5.0
+
   '@rollup/rollup-android-arm-eabi@4.59.0':
     optional: true
 
@@ -572,6 +612,10 @@ snapshots:
 
   '@webgpu/types@0.1.69': {}
 
+  colorin@0.5.0: {}
+
+  colorin@0.6.0: {}
+
   esbuild@0.27.3:
     optionalDependencies:
       '@esbuild/aix-ppc64': 0.27.3
@@ -605,8 +649,25 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.3
 
+  frustum-intersects@0.1.0: {}
+
   fsevents@2.3.3:
     optional: true
+
+  lineclip@1.1.5: {}
+
+  maptalks@1.12.1:
+    dependencies:
+      '@maptalks/feature-filter': 1.3.0
+      '@maptalks/function-type': 1.4.1
+      colorin: 0.6.0
+      frustum-intersects: 0.1.0
+      lineclip: 1.1.5
+      rbush: 2.0.2
+      simplify-js: 1.2.4
+    optionalDependencies:
+      '@rollup/rollup-darwin-x64': 4.59.0
+      '@rollup/rollup-linux-x64-gnu': 4.59.0
 
   nanoid@3.3.11: {}
 
@@ -619,6 +680,12 @@ snapshots:
       nanoid: 3.3.11
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  quickselect@1.1.1: {}
+
+  rbush@2.0.2:
+    dependencies:
+      quickselect: 1.1.1
 
   rollup@4.59.0:
     dependencies:
@@ -650,6 +717,8 @@ snapshots:
       '@rollup/rollup-win32-x64-gnu': 4.59.0
       '@rollup/rollup-win32-x64-msvc': 4.59.0
       fsevents: 2.3.3
+
+  simplify-js@1.2.4: {}
 
   source-map-js@1.2.1: {}
 
