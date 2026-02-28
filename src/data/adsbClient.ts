@@ -1,6 +1,12 @@
+/// <reference types="vite/client" />
 import type { Aircraft, AircraftCategory, AdsbApiResponse, AdsbApiAircraft } from '../types/aircraft.ts';
 
-const API_BASE = 'https://api.adsb.lol/v2';
+// Use Vite proxy in dev (/api/adsb → https://api.adsb.lol)
+// In production, use a CORS proxy or direct URL if server supports it
+const API_BASE = import.meta.env.DEV
+  ? '/api/adsb/v2'
+  : 'https://api.adsb.lol/v2';
+
 const POLL_INTERVAL_MS = 8000;
 
 function categorizeAircraft(ac: AdsbApiAircraft): AircraftCategory {
@@ -124,7 +130,7 @@ export class AdsbClient {
       this.consecutiveFailures++;
       console.warn('ADS-B API failed, failure count:', this.consecutiveFailures, err);
 
-      if (this.consecutiveFailures >= 2 && !this.isSimulating) {
+      if (this.consecutiveFailures >= 1 && !this.isSimulating) {
         this.activateSimulation();
       } else if (this.isSimulating) {
         this.tickSimulation();

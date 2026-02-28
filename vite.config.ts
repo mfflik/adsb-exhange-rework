@@ -7,6 +7,14 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
+    proxy: {
+      '/api/adsb': {
+        target: 'https://api.adsb.lol',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/adsb/, ''),
+        secure: true,
+      },
+    },
   },
   build: {
     target: 'esnext',
